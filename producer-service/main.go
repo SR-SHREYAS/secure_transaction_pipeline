@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"secure_transaction_pipeline/producer-service/api"
+	"secure_transaction_pipeline/producer-service/app"
 
-	"secure_transaction_pipeline/producer-service/internal"
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
@@ -20,10 +21,10 @@ func main() {
 	}
 	defer client.Close()
 
-	app := internal.NewApp(client)
-	handler := internal.NewHandler(app)
-	internal.RegisterRoutes(handler)
+	app := app.NewApp(client)
+	producer := api.NewProducer(app)
+	api.RegisterRoutes(producer)
 
 	fmt.Println("Producer running on :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":8080", nil)) // client-facing HTTP server
 }

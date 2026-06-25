@@ -1,27 +1,33 @@
-package internal
+package app
 
 import (
 	"context"
 	"encoding/json"
+	"secure_transaction_pipeline/producer-service/models"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
+// App interface defines the application layer contract
+type App interface {
+	CreateOrder(ctx context.Context, req models.OrderRequest) (*models.Order, error)
+}
+
 // App owns application-level dependencies and business operations.
-type App struct {
+type AppImpl struct {
 	client *kgo.Client
 }
 
 // NewApp builds an App around the shared Kafka client.
-func NewApp(client *kgo.Client) *App {
-	return &App{client: client}
+func NewApp(client *kgo.Client) *AppImpl {
+	return &AppImpl{client: client}
 }
 
 // CreateOrder sends a record to Kafka and returns any broker/client error.
-func (a *App) CreateOrder(ctx context.Context, OrderReq OrderRequest) (Order, error) {
-	response_order := Order{
+func (a *AppImpl) CreateOrder(ctx context.Context, OrderReq models.OrderRequest) (*models.Order, error) {
+	response_order := models.Order{
 		ID:        uuid.New().String(),
 		Customer:  OrderReq.Customer,
 		Product:   OrderReq.Product,
@@ -34,7 +40,7 @@ func (a *App) CreateOrder(ctx context.Context, OrderReq OrderRequest) (Order, er
 	// serialize the order to JSON for sending to Kafka
 	orderBytes, err := json.Marshal(response_order)
 	if err != nil {
-		return Order{}, err // return an empty order and the error
+		return &models.Order{}, err // return an empty order and the error
 	}
 
 	// kafka record with order id as key
@@ -45,7 +51,7 @@ func (a *App) CreateOrder(ctx context.Context, OrderReq OrderRequest) (Order, er
 		Value: orderBytes,
 	}
 	if err := a.client.ProduceSync(ctx, record).FirstErr(); err != nil {
-		return Order{}, err // return an empty order and the error
+		return &models.Order{}, err // return an empty order and the error
 	}
-	return response_order, nil
+	return &response_order, nil
 }
