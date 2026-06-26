@@ -24,3 +24,18 @@ loggs of new incomming order would show up in consumer-service/go run terminal
 logs for only newer messages/orders 
 why ?
 When your consumer processes a record, franz-go automatically commits the offset back to Kafka. On restart, Kafka tells the consumer to start reading from the next uncommitted offset. This is the core value of consumer groups: crash recovery without reprocessing.
+
+
+// posstgress.go 
+sql.Open("postgres", ...) creates a connection pool to PostgreSQL using the credentials from your Docker Compose stack.
+
+createTable() ensures the orders table exists before any records are processed.
+
+// redis.go
+redis.NewClient(&redis.Options{Addr: "localhost:6379"}) connects to the Redis container for fast key lookups.
+
+// CREATE TABLE IF NOT EXISTS statement on startup means the consumer is self-contained. You do not need a separate migration step or manual SQL. The id column is the primary key, which also serves as a safety net for duplicates at the database level.
+
+//Redis gives you a fast in-memory lookup (microseconds) to catch duplicates before hitting the database. The ON CONFLICT DO NOTHING clause on the PostgreSQL INSERT acts as a safety net for edge cases where the Redis key expired (after 24 hours) but the order already exists in the database.
+
+This two-layer approach is the standard production pattern: a fast cache for the hot path and a durable store as the final authority.

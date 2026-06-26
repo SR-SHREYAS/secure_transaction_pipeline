@@ -4,25 +4,28 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"secure_transaction_pipeline/producer-service/api"
-	"secure_transaction_pipeline/producer-service/app"
 
-	"github.com/twmb/franz-go/pkg/kgo"
+	"secure_transaction_pipeline/producer-service/api"
+	producerapp "secure_transaction_pipeline/producer-service/app"
+	"secure_transaction_pipeline/producer-service/messages"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
-	var err error
-	// Connect to Kafka using the franz-go client
-	client, err := kgo.NewClient(
-		kgo.SeedBrokers("localhost:9092"), // seed broker is used to discover the cluster
-	)
+	// Load environment variables from .env file
+	if err := godotenv.Load("../.env"); err != nil {
+		log.Fatalf("failed to load .env: %v", err)
+	}
+
+	kafkaClient, err := messages.NewKafkaClient()
 	if err != nil {
 		log.Fatalf("failed to create kafka client: %v", err)
 	}
-	defer client.Close()
+	defer kafkaClient.Close()
 
-	app := app.NewApp(client)
-	producer := api.NewProducer(app)
+	producerApp := producerapp.NewApp(kafkaClient)
+	producer := api.NewProducer(producerApp)
 	api.RegisterRoutes(producer)
 
 	fmt.Println("Producer running on :8080")
