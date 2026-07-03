@@ -7,7 +7,6 @@ import (
 	"log"
 	"time"
 
-	redisclient "github.com/redis/go-redis/v9"
 	"github.com/twmb/franz-go/pkg/kgo"
 
 	models "secure_transaction_pipeline/consumer-service/models"
@@ -41,12 +40,13 @@ func (a *AppImpl) ProcessOrders(ctx context.Context, messages [][]byte) error {
 			continue
 		}
 
-		// check redis : has the order been processed before? if yes, skip it
-		processed, err := a.redisStore.Get(ctx, "processed_order:"+order.ID)
-		if err != nil && err != redisclient.Nil {
+		// check redis: has the order been processed before? if yes, skip it
+		processed, found, err := a.redisStore.Get(ctx, "processed_order:"+order.ID)
+		if err != nil {
 			return fmt.Errorf("failed to check redis for processed order: %w", err)
 		}
-		if processed == "true" {
+		// only skip if the key exists and is explicitly marked as processed
+		if found && processed == "true" {
 			log.Printf("order %s already processed, skipping", order.ID)
 			continue
 		}
