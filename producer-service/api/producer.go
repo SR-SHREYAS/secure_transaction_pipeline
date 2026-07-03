@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"secure_transaction_pipeline/producer-service/app"
 	"secure_transaction_pipeline/producer-service/models"
@@ -47,6 +48,7 @@ func (h *Producer) createOrder(w http.ResponseWriter, r *http.Request) {
 	// produce through the app layer so the handler only sees a publish error
 	response_order, err := h.app.CreateOrder(r.Context(), orderReq)
 	if err != nil {
+		log.Printf("failed to produce order to Kafka: %v", err)
 		http.Error(w, "Failed to produce order to Kafka", http.StatusInternalServerError)
 		return
 	}

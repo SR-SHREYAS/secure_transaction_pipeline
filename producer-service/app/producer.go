@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"secure_transaction_pipeline/producer-service/models"
 	"time"
 
@@ -50,8 +51,11 @@ func (a *AppImpl) CreateOrder(ctx context.Context, OrderReq models.OrderRequest)
 		Key:   []byte(response_order.ID),
 		Value: orderBytes,
 	}
-	if err := a.client.ProduceSync(ctx, record).FirstErr(); err != nil {
-		return &models.Order{}, err // return an empty order and the error
+	publishCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	if err := a.client.ProduceSync(publishCtx, record).FirstErr(); err != nil {
+		return &models.Order{}, fmt.Errorf("failed to produce order to kafka: %w", err)
 	}
 	return &response_order, nil
 }

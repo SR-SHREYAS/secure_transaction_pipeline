@@ -15,6 +15,10 @@ func NewKafkaClient() (*kgo.Client, error) {
 	}
 
 	groupID := os.Getenv("KAFKA_GROUP_ID")
+
+	// to check idempotency
+	// test := "order-processors-test"
+
 	if groupID == "" {
 		return nil, fmt.Errorf("KAFKA_GROUP_ID is not set")
 	}
@@ -27,6 +31,9 @@ func NewKafkaClient() (*kgo.Client, error) {
 	client, err := kgo.NewClient(
 		kgo.SeedBrokers(brokers...),
 		kgo.ConsumerGroup(groupID),
+
+		// kgo.ConsumerGroup(test),
+
 		kgo.ConsumeTopics(topic),
 	)
 	if err != nil {
