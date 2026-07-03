@@ -13,9 +13,10 @@ import (
 )
 
 func main() {
-	// Load environment variables from .env file
+	// Optionally load environment variables from a .env file in local/dev.
+	// In containerized or production environments, it's fine if this file is absent.
 	if err := godotenv.Load("../.env"); err != nil {
-		log.Fatalf("failed to load .env: %v", err)
+		log.Printf("no .env file loaded: %v (continuing with existing environment)", err)
 	}
 
 	kafkaClient, err := messages.NewKafkaClient()

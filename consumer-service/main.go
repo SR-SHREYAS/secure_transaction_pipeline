@@ -11,19 +11,20 @@ import (
 	"secure_transaction_pipeline/consumer-service/api"
 	app "secure_transaction_pipeline/consumer-service/app"
 	"secure_transaction_pipeline/consumer-service/messages"
-	postgresstorage "secure_transaction_pipeline/consumer-service/storage/postgress"
+	postgresstorage "secure_transaction_pipeline/consumer-service/storage/postgres"
 	redisstorage "secure_transaction_pipeline/consumer-service/storage/redis"
 
 	"github.com/joho/godotenv"
 )
 
 func main() {
-	// Load environment variables from .env file
+	// Optionally load environment variables from a .env file in local/dev.
+	// In containerized or production environments, it's fine if this file is absent.
 	if err := godotenv.Load("../.env"); err != nil {
-		log.Fatalf("failed to load .env: %v", err)
+		log.Printf("no .env file loaded: %v (continuing with existing environment)", err)
 	}
 
-	postgresStorage, err := postgresstorage.NewPostgressStorage()
+	postgresStorage, err := postgresstorage.NewStorage()
 	if err != nil {
 		log.Fatalf("failed to create postgres storage: %v", err)
 	}

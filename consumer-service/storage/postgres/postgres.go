@@ -1,4 +1,4 @@
-package postgress
+package postgres
 
 import (
 	"context"
@@ -13,7 +13,7 @@ type PostgresStorage struct {
 	db *sql.DB
 }
 
-func NewPostgressStorage() (*PostgresStorage, error) {
+func NewStorage() (*PostgresStorage, error) {
 	host := os.Getenv("POSTGRES_HOST")
 	if host == "" {
 		return nil, fmt.Errorf("POSTGRES_HOST is not set")

@@ -26,7 +26,7 @@ why ?
 When your consumer processes a record, franz-go automatically commits the offset back to Kafka. On restart, Kafka tells the consumer to start reading from the next uncommitted offset. This is the core value of consumer groups: crash recovery without reprocessing.
 
 
-// posstgress.go 
+ // postgres.go 
 sql.Open("postgres", ...) creates a connection pool to PostgreSQL using the credentials from your Docker Compose stack.
 
 createTable() ensures the orders table exists before any records are processed.

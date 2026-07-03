@@ -11,7 +11,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 
 	models "secure_transaction_pipeline/consumer-service/models"
-	"secure_transaction_pipeline/consumer-service/storage/postgress"
+	"secure_transaction_pipeline/consumer-service/storage/postgres"
 	"secure_transaction_pipeline/consumer-service/storage/redis"
 )
 
@@ -22,14 +22,14 @@ type App interface {
 
 // AppImpl is the default application layer implementation.
 type AppImpl struct {
-	client         *kgo.Client
-	postgressStore *postgress.PostgresStorage
-	redisStore     *redis.RedisStorage
+	client        *kgo.Client
+	postgresStore *postgres.PostgresStorage
+	redisStore    *redis.RedisStorage
 }
 
 // NewApp builds the application layer around the shared Kafka client.
-func NewApp(client *kgo.Client, postgress *postgress.PostgresStorage, redis *redis.RedisStorage) *AppImpl {
-	return &AppImpl{client: client, postgressStore: postgress, redisStore: redis}
+func NewApp(client *kgo.Client, postgres *postgres.PostgresStorage, redis *redis.RedisStorage) *AppImpl {
+	return &AppImpl{client: client, postgresStore: postgres, redisStore: redis}
 }
 
 // ProcessOrders receives raw Kafka payloads from the API layer, decodes them, and handles them.
@@ -48,14 +48,14 @@ func (a *AppImpl) ProcessOrders(ctx context.Context, messages [][]byte) error {
 		}
 		if processed == "true" {
 			log.Printf("order %s already processed, skipping", order.ID)
-			return nil
+			continue
 		}
 
 		//mark order as confirmed in redis before persisting to postgres
 		order.Status = "confirmed"
 
 		//insert into postgres with ON CONFLICT as a safety net to avoid duplicates
-		_, err = a.postgressStore.ExecContext(ctx, `
+		_, err = a.postgresStore.ExecContext(ctx, `
 			INSERT INTO orders (id, customer, product, quantity, price, status, created_at)
 			VALUES ($1, $2, $3, $4, $5, $6, $7)
 			ON CONFLICT (id) DO NOTHING`,
@@ -68,13 +68,13 @@ func (a *AppImpl) ProcessOrders(ctx context.Context, messages [][]byte) error {
 			order.CreatedAt,
 		)
 		if err != nil {
-			return fmt.Errorf("failed to insert order into postgres: %v", err)
+			return fmt.Errorf("failed to insert order into postgres: %w", err)
 		}
 
 		// mark this order ID as processed in redis with 24 hr TTL
 		err = a.redisStore.Set(ctx, "processed_order:"+order.ID, "true", 24*time.Hour)
 		if err != nil {
-			return fmt.Errorf("failed to mark order as processed in redis: %v", err)
+			return fmt.Errorf("failed to mark order as processed in redis: %w", err)
 		}
 
 		log.Printf("processed order: ID=%s, customer=%s, product=%s, quantity=%d, price=%.2f, status=%s, created_at=%s",
