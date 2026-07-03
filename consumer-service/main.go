@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
-	"errors"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"secure_transaction_pipeline/consumer-service/api"
@@ -16,6 +17,7 @@ import (
 	redisstorage "secure_transaction_pipeline/consumer-service/storage/redis"
 
 	"github.com/joho/godotenv"
+	"github.com/twmb/franz-go/pkg/kgo"
 )
 
 func loadEnv() {
@@ -31,6 +33,28 @@ func loadEnv() {
 	}
 
 	log.Printf("no .env file loaded from %v (continuing with existing environment)", paths)
+}
+
+func loadBrokers() []string {
+	raw := os.Getenv("KAFKA_BROKERS")
+	if raw == "" {
+		log.Fatalf("KAFKA_BROKERS is not set")
+	}
+
+	parts := strings.Split(raw, ",")
+	brokers := make([]string, 0, len(parts))
+	for _, part := range parts {
+		broker := strings.TrimSpace(part)
+		if broker != "" {
+			brokers = append(brokers, broker)
+		}
+	}
+
+	if len(brokers) == 0 {
+		log.Fatalf("KAFKA_BROKERS is empty")
+	}
+
+	return brokers
 }
 
 func main() {
@@ -53,6 +77,14 @@ func main() {
 	}
 	defer redisStorage.Close()
 
+	dlqClient, err := kgo.NewClient(
+		kgo.SeedBrokers(loadBrokers()...),
+	)
+	if err != nil {
+		log.Fatalf("failed to create dlq kafka client: %v", err)
+	}
+	defer dlqClient.Close()
+
 	kafkaClient, err := messages.NewKafkaClient()
 	if err != nil {
 		log.Fatalf("failed to create kafka client: %v", err)
@@ -70,7 +102,7 @@ func main() {
 
 	fmt.Println("Starting consumer, waiting for orders...")
 
-	consumerApp := app.NewApp(kafkaClient, postgresStorage, redisStorage)
+	consumerApp := app.NewApp(kafkaClient, dlqClient, postgresStorage, redisStorage)
 	consumer := api.NewConsumer(kafkaClient, consumerApp)
 	go consumer.ProcessOrders(ctx) // Start the consumer in a separate goroutine
 

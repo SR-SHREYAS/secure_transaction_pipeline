@@ -36,18 +36,18 @@ func (c *Consumer) ProcessOrders(ctx context.Context) {
 			continue
 		}
 
-		messages := make([][]byte, 0) // empty slice to hold the raw message payloads
-		iter := fetches.RecordIter()  // iterate over all records in the fetches
+		records := make([]*kgo.Record, 0)
+		iter := fetches.RecordIter() // iterate over all records in the fetches
 		for !iter.Done() {
 			record := iter.Next()
-			messages = append(messages, record.Value)
+			records = append(records, record)
 		}
 
-		if len(messages) == 0 {
+		if len(records) == 0 {
 			continue
 		}
 
-		if err := c.app.ProcessOrders(ctx, messages); err != nil {
+		if err := c.app.ProcessOrders(ctx, records); err != nil {
 			log.Printf("failed to forward orders to app layer: %v", err)
 		}
 	}
