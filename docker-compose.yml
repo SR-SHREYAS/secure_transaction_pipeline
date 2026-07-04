@@ -37,18 +37,18 @@ services:
     ports:
       - "6379:6379"
 
-  producer:
-    build:
-      context: .
-      dockerfile: producer-service/Dockerfile
-    container_name: producer
-    restart: unless-stopped
-    depends_on:
-      - kafka
-    ports:
-      - "8080:8080"
-    environment:
-      KAFKA_BROKERS: kafka:9092
+  # producer:
+  #   build:
+  #     context: .
+  #     dockerfile: producer-service/Dockerfile
+  #   container_name: producer
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - kafka
+  #   ports:
+  #     - "8080:8080"
+  #   environment:
+  #     KAFKA_BROKERS: kafka:9092
 
   consumer:
     build:
