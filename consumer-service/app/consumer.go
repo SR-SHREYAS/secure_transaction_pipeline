@@ -16,27 +16,35 @@ import (
 
 // App defines the consumer-side application contract.
 type App interface {
-	ProcessOrders(ctx context.Context, messages [][]byte) error
+	ProcessOrders(ctx context.Context, records []*kgo.Record) error
 }
 
 // AppImpl is the default application layer implementation.
 type AppImpl struct {
 	client        *kgo.Client
+	dlqClient     *kgo.Client
 	postgresStore *postgres.PostgresStorage
 	redisStore    *redis.RedisStorage
 }
 
 // NewApp builds the application layer around the shared Kafka client.
-func NewApp(client *kgo.Client, postgres *postgres.PostgresStorage, redis *redis.RedisStorage) *AppImpl {
-	return &AppImpl{client: client, postgresStore: postgres, redisStore: redis}
+func NewApp(client *kgo.Client, dlqClient *kgo.Client, postgres *postgres.PostgresStorage, redis *redis.RedisStorage) *AppImpl {
+	return &AppImpl{client: client, dlqClient: dlqClient, postgresStore: postgres, redisStore: redis}
 }
 
 // ProcessOrders receives raw Kafka payloads from the API layer, decodes them, and handles them.
-func (a *AppImpl) ProcessOrders(ctx context.Context, messages [][]byte) error {
-	for _, message := range messages {
+func (a *AppImpl) ProcessOrders(ctx context.Context, records []*kgo.Record) error {
+	for _, record := range records {
 		var order models.Order
-		if err := json.Unmarshal(message, &order); err != nil {
-			log.Printf("failed to decode order: %v", err)
+		if err := json.Unmarshal(record.Value, &order); err != nil {
+			a.publishToDLQ(ctx, record, fmt.Sprintf("unmarshal error: %v", err))
+			log.Printf("sent poison message to DLQ: %v", err)
+			continue
+		}
+
+		if order.Customer == "" || order.Price < 0 {
+			a.publishToDLQ(ctx, record, "validation failed: missing customer or negative price")
+			log.Printf("sent invalid order to DLQ: id=%s", order.ID)
 			continue
 		}
 
@@ -89,6 +97,22 @@ func (a *AppImpl) ProcessOrders(ctx context.Context, messages [][]byte) error {
 	}
 
 	return nil
+}
+
+func (a *AppImpl) publishToDLQ(ctx context.Context, original *kgo.Record, errMsg string) {
+	dlqRecord := &kgo.Record{
+		Topic: "orders-dlq",
+		Key:   original.Key,
+		Value: original.Value,
+		Headers: []kgo.RecordHeader{
+			{Key: "error", Value: []byte(errMsg)},
+			{Key: "original-topic", Value: []byte(original.Topic)},
+		},
+	}
+
+	if err := a.dlqClient.ProduceSync(ctx, dlqRecord).FirstErr(); err != nil {
+		log.Printf("failed to produce to DLQ: %v", err)
+	}
 }
 
 // // getOrders receives decoded orders from the API layer and handles them.
